@@ -1,0 +1,70 @@
+mqtt:
+  enabled: true
+  host: <host-ip>
+
+detectors:
+  cpu0:
+    type: cpu
+  cpu1:
+    type: cpu
+
+# 1. The Proxy Section (Go2rtc)
+# This connects to ESP32 ONCE.
+go2rtc:
+  streams:
+    doorbell:
+      - http://<esp32-cam-ip>:8080/
+
+cameras:
+  doorbell:
+    ffmpeg:
+      inputs:
+        # 2. Frigate connects to Go2rtc (Localhost), NOT the camera.
+        # This is incredibly fast and uses almost no CPU.
+        - path: rtsp://127.0.0.1:8554/doorbell
+          roles:
+            - detect
+          # We tell FFmpeg "This is already MJPEG, don't over-analyze it"
+          input_args: preset-http-mjpeg-generic
+
+    # 3. Detection matches your new ESPHome resolution (VGA)
+    # We resize to 320x240 for the "Potato Mode" detection on your Core 2 Duo.
+    detect:
+      enabled: true
+      width: 320
+      height: 240
+      fps: 5
+
+    # Optimizing
+    # (The live view will look blurry/small, but detection will be fast)
+    live:
+      height: 240
+
+
+    objects:
+      track:
+        - person
+
+    snapshots:
+      enabled: true
+      timestamp: true
+      bounding_box: true
+      retain:
+        default: 14
+
+
+    mqtt:
+      enabled: true
+      timestamp: true
+      bounding_box: true
+      crop: false
+      quality: 100
+      height: 600
+# You can also edit the below using the UI to adjust motion sensitivity.
+    motion:
+      threshold: 39
+      contour_area: 10
+      improve_contrast: false
+
+    zones: {}
+version: 0.16-0
