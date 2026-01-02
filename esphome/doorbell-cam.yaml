@@ -1,0 +1,112 @@
+esphome:
+  name: doorbellcam
+
+esp32:
+  board: esp32cam
+  framework:
+    type: arduino
+
+# __ Wi-Fi __
+wifi:
+  ssid: "WIFI_SSID"
+  password: "WIFI_PASSWORD"
+  
+  fast_connect: true
+  power_save_mode: none
+
+  ap:
+    ssid: "FALLBACK_SSID"
+    password: "FALLBACK_PASSWORD"
+
+# __ Home Assistant & OTA __
+api:
+ota:
+
+
+# __ Time sync __
+time:
+  - platform: homeassistant
+    id: ha_time
+
+# __ Camera config for AI thinker __
+esp32_camera:
+  name: "Front Door Camera"
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+
+  # To rotate the image by 180 degree
+  vertical_flip: false
+  horizontal_mirror: false
+
+  resolution: VGA       
+  jpeg_quality:  10
+  max_framerate: 5 fps   
+  idle_framerate: 0.1 fps
+
+  # Adjust brightness according to the environment
+  aec2: true
+  ae_level: 2
+  agc_gain_ceiling: 2x
+  brightness: 2
+  contrast: 1
+
+# __ Camera stream for Frigate __
+esp32_camera_web_server:
+  - port: 8080
+    mode: stream
+
+
+# __ Doorbell button __
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO13
+      mode: INPUT_PULLDOWN
+    name: "Doorbell Button"
+    id: doorbell_touch
+    filters:
+      - delayed_on: 10ms
+    on_press:
+      then:
+        - homeassistant.event:
+            event: esphome.doorbell_pressed
+            data:
+              device: doorbellcam
+
+# __ Status LED (for troubleshooting) __
+status_led:
+  pin:
+    number: GPIO33
+    inverted: true
+
+# __ Flashlight Control (PWM for Brightness) __
+output:
+  - platform: ledc
+    pin: GPIO4
+    id: gpio_4_pwm
+    channel: 2  # Channels 0-1 might be used by the camera, safer to use 2
+
+light:
+  - platform: monochromatic
+    output: gpio_4_pwm
+    name: "Doorbell Flash"
+    restore_mode: ALWAYS_OFF # Does not turn on while booting :)
+
+# __ Troubleshooting tools __
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+sensor:
+  - platform: wifi_signal
+    name: "Doorbell WiFi Signal"
+    update_interval: 60s
